@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import emailjs from '@emailjs/browser'
 
 function AuthSystem({ onAuth }) {
-  const [currentEmail, setCurrentEmail] = useState('')
+  const [currentEmail, setCurrentEmail] = useState('shakibjilani@gmail.com')
   const [generatedOtp, setGeneratedOtp] = useState('')
   const [showEmailForm, setShowEmailForm] = useState(true)
   const [emailMessage, setEmailMessage] = useState('')
@@ -10,12 +9,8 @@ function AuthSystem({ onAuth }) {
   const [isLoading, setIsLoading] = useState(false)
 
   const apiConfig = {
-    provider: 'emailjs',
-    emailjs: {
-      serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
-      templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
-      publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-    }
+    provider: 'local-node',
+    url: 'http://localhost:3001/api/send-otp'
   }
 
   const generateOtp = () => {
@@ -28,26 +23,20 @@ function AuthSystem({ onAuth }) {
   }
 
   const sendOtpViaEmail = async (email, otp) => {
-    const message = `Your verification code is: ${otp}. Valid for 5 minutes.`
-    const config = apiConfig.emailjs
-
     try {
-      const templateParams = {
-        to_email: email,
-        message: message
-      }
+      const response = await fetch(apiConfig.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, otp })
+      })
 
-      const response = await emailjs.send(
-        config.serviceId,
-        config.templateId,
-        templateParams,
-        config.publicKey
-      )
-
-      return { success: response.status === 200, data: response }
+      const data = await response.json()
+      return { success: response.ok && data.success, data }
     } catch (error) {
-      console.error('Email API Error:', error)
-      return { success: false, error: error.text || error.message }
+      console.error('API Error:', error)
+      return { success: false, error: error.message }
     }
   }
 
