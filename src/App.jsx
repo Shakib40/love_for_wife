@@ -7,7 +7,7 @@ function App() {
 
   return (
     <div className="app">
-      <AuthSystem onAuth={() => setIsAuthenticated(true)} />
+      {!isAuthenticated && <AuthSystem onAuth={() => setIsAuthenticated(true)} />}
       {isAuthenticated && <MainContent />}
     </div>
   )

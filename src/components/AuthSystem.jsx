@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react'
+import emailjs from '@emailjs/browser'
 
 function AuthSystem({ onAuth }) {
-  const [currentPhone, setCurrentPhone] = useState('')
+  const [currentEmail, setCurrentEmail] = useState('')
   const [generatedOtp, setGeneratedOtp] = useState('')
-  const [showPhoneForm, setShowPhoneForm] = useState(true)
-  const [phoneMessage, setPhoneMessage] = useState('')
+  const [showEmailForm, setShowEmailForm] = useState(true)
+  const [emailMessage, setEmailMessage] = useState('')
   const [otpMessage, setOtpMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   const apiConfig = {
-    provider: 'twilio',
-    twilio: {
-      accountSid: import.meta.env.VITE_TWILIO_ACCOUNT_SID,
-      authToken: import.meta.env.VITE_TWILIO_AUTH_TOKEN,
-      fromNumber: import.meta.env.VITE_TWILIO_FROM_NUMBER,
-      url: `https://api.twilio.com/2010-04-01/Accounts/${import.meta.env.VITE_TWILIO_ACCOUNT_SID}/Messages.json`
+    provider: 'emailjs',
+    emailjs: {
+      serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+      templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+      publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY
     }
   }
 
@@ -22,80 +22,67 @@ function AuthSystem({ onAuth }) {
     return Math.floor(100000 + Math.random() * 900000).toString()
   }
 
-  const validatePhone = (phone) => {
-    const phoneRegex = /^[0-9]{10}$/
-    return phoneRegex.test(phone)
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
   }
 
-  const sendOtpViaSms = async (phone, otp) => {
+  const sendOtpViaEmail = async (email, otp) => {
     const message = `Your verification code is: ${otp}. Valid for 5 minutes.`
-    const config = apiConfig.twilio
+    const config = apiConfig.emailjs
 
     try {
-      const params = new URLSearchParams()
-      params.append('To', phone)
-      params.append('From', config.fromNumber)
-      params.append('Body', message)
+      const templateParams = {
+        to_email: email,
+        message: message
+      }
 
-      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Messages.json`
+      const response = await emailjs.send(
+        config.serviceId,
+        config.templateId,
+        templateParams,
+        config.publicKey
+      )
 
-      const response = await fetch(twilioUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + btoa(`${config.accountSid}:${config.authToken}`),
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: params
-      })
-
-      const result = await response.json()
-      return { success: response.ok, data: result }
-
+      return { success: response.status === 200, data: response }
     } catch (error) {
-      console.error('SMS API Error:', error)
-      return { success: false, error: error.message }
+      console.error('Email API Error:', error)
+      return { success: false, error: error.text || error.message }
     }
   }
 
-  const handlePhoneSubmit = async (e) => {
+  const handleEmailSubmit = async (e) => {
     e.preventDefault()
-    const phone = currentPhone.trim()
+    const email = currentEmail.trim()
 
-    setPhoneMessage('')
+    setEmailMessage('')
     setIsLoading(true)
 
-    if (!validatePhone(phone)) {
-      setPhoneMessage('Please enter a valid 10-digit phone number')
+    if (!validateEmail(email)) {
+      setEmailMessage('Please enter a valid email address')
       setIsLoading(false)
       return
     }
 
-    const fullPhone = '+91' + phone
     const otp = generateOtp()
     setGeneratedOtp(otp)
 
     try {
-      const smsResult = await sendOtpViaSms(fullPhone, otp)
+      const emailResult = await sendOtpViaEmail(email, otp)
 
-      if (smsResult.success) {
-        setPhoneMessage(`OTP sent to +91 ${phone}`)
+      if (emailResult.success) {
+        setEmailMessage(`OTP sent to ${email}`)
         setTimeout(() => {
-          setShowPhoneForm(false)
+          setShowEmailForm(false)
         }, 1500)
       } else {
-        console.log('SMS API failed, using fallback. OTP:', otp)
-        setPhoneMessage(`OTP sent to +91 ${phone} (Check console for demo)`)
-        setTimeout(() => {
-          setShowPhoneForm(false)
-        }, 1500)
+        const errorMessage = emailResult.data?.text || emailResult.error || 'Failed to send email'
+        console.error('Email API failed:', errorMessage)
+        setEmailMessage(`Error: ${errorMessage}`)
       }
     } catch (error) {
       console.error('Error sending OTP:', error)
-      console.log('Using fallback OTP:', otp)
-      setPhoneMessage(`OTP sent to +91 ${phone} (Check console for demo)`)
-      setTimeout(() => {
-        setShowPhoneForm(false)
-      }, 1500)
+      setEmailMessage(`Error: ${error.message || 'Failed to connect to Email service'}`)
     } finally {
       setIsLoading(false)
     }
@@ -128,23 +115,23 @@ function AuthSystem({ onAuth }) {
   }
 
   const resendOtp = async () => {
-    const phone = currentPhone.replace('+91', '')
+    const email = currentEmail.trim()
     const otp = generateOtp()
     setGeneratedOtp(otp)
 
     try {
-      const smsResult = await sendOtpViaSms('+91' + phone, otp)
+      const emailResult = await sendOtpViaEmail(email, otp)
 
-      if (smsResult.success) {
-        setOtpMessage(`New OTP sent to +91 ${phone}`)
+      if (emailResult.success) {
+        setOtpMessage(`New OTP sent to ${email}`)
       } else {
-        console.log('SMS API failed, using fallback. New OTP:', otp)
-        setOtpMessage(`New OTP sent to +91 ${phone} (Check console)`)
+        const errorMessage = emailResult.data?.text || emailResult.error || 'Failed to resend email'
+        console.error('Email API failed:', errorMessage)
+        setOtpMessage(`Error: ${errorMessage}`)
       }
     } catch (error) {
       console.error('Error resending OTP:', error)
-      console.log('Using fallback OTP:', otp)
-      setOtpMessage(`New OTP sent to +91 ${phone} (Check console)`)
+      setOtpMessage(`Error: ${error.message || 'Failed to connect to Email service'}`)
     }
 
     // Clear OTP inputs
@@ -153,59 +140,60 @@ function AuthSystem({ onAuth }) {
     inputs[0]?.focus()
   }
 
-  const backToPhone = () => {
-    setShowPhoneForm(true)
-    setPhoneMessage('')
+  const backToEmail = () => {
+    setShowEmailForm(true)
+    setEmailMessage('')
     setOtpMessage('')
   }
 
-  useEffect(() => {
-    // OTP input auto-focus logic
-    const otpInputs = document.querySelectorAll('.otp-input')
-
-    const handleOtpInput = (e, index) => {
-      if (e.target.value && index < otpInputs.length - 1) {
-        otpInputs[index + 1]?.focus()
-      }
+  const handleOtpInput = (e, index) => {
+    e.target.value = e.target.value.replace(/[^0-9]/g, '')
+    if (e.target.value && index < 5) {
+      document.querySelector(`input[name='otp${index + 1}']`)?.focus()
     }
+  }
 
-    const handleOtpKeyDown = (e, index) => {
-      if (e.key === 'Backspace' && !e.target.value && index > 0) {
-        otpInputs[index - 1]?.focus()
-      }
-      // Only allow numbers
-      e.target.value = e.target.value.replace(/[^0-9]/g, '')
+  const handleOtpKeyDown = (e, index) => {
+    if (e.key === 'Backspace' && !e.target.value && index > 0) {
+      document.querySelector(`input[name='otp${index - 1}']`)?.focus()
     }
+  }
 
-    otpInputs.forEach((input, index) => {
-      input.addEventListener('input', (e) => handleOtpInput(e, index))
-      input.addEventListener('keydown', (e) => handleOtpKeyDown(e, index))
-    })
-  }, [])
+  const handleOtpPaste = (e) => {
+    e.preventDefault()
+    const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6)
+    if (pastedData) {
+      const chars = pastedData.split('')
+      chars.forEach((char, i) => {
+        const input = document.querySelector(`input[name='otp${i}']`)
+        if (input) input.value = char
+      })
+      const focusIndex = Math.min(chars.length, 5)
+      const inputToFocus = document.querySelector(`input[name='otp${focusIndex === 6 ? 5 : focusIndex}']`)
+      inputToFocus?.focus()
+    }
+  }
 
   return (
     <div className="auth-overlay active">
       <div className="auth-container">
-        {/* Phone Number Form */}
-        {showPhoneForm ? (
+        {/* Email Form */}
+        {showEmailForm ? (
           <div className="auth-form">
             <h2 className="auth-title">Welcome</h2>
-            <p className="auth-subtitle">Please enter your phone number to continue</p>
+            <p className="auth-subtitle">Please enter your email address to continue</p>
 
-            <form onSubmit={handlePhoneSubmit}>
+            <form onSubmit={handleEmailSubmit}>
               <div className="form-group">
-                <label className="form-label" htmlFor="phoneNumber">Phone Number</label>
+                <label className="form-label" htmlFor="emailAddress">Email Address</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: '#c9a84c', fontSize: '1rem', fontWeight: 'bold' }}>+91</span>
                   <input
-                    type="tel"
-                    id="phoneNumber"
+                    type="email"
+                    id="emailAddress"
                     className="form-input"
-                    placeholder="9876543210"
-                    pattern="[0-9]{10}"
-                    maxLength={10}
-                    value={currentPhone}
-                    onChange={(e) => setCurrentPhone(e.target.value)}
+                    placeholder="you@example.com"
+                    value={currentEmail}
+                    onChange={(e) => setCurrentEmail(e.target.value)}
                     required
                   />
                 </div>
@@ -216,9 +204,9 @@ function AuthSystem({ onAuth }) {
               </button>
             </form>
 
-            {phoneMessage && (
-              <div className={`auth-message ${phoneMessage.includes('Please') ? 'error' : 'success'}`}>
-                {phoneMessage}
+            {emailMessage && (
+              <div className={`auth-message ${emailMessage.includes('Please') ? 'error' : 'success'}`}>
+                {emailMessage}
               </div>
             )}
           </div>
@@ -226,7 +214,7 @@ function AuthSystem({ onAuth }) {
           /* OTP Verification Form */
           <div className="auth-form">
             <h2 className="auth-title">Verify OTP</h2>
-            <p className="auth-subtitle">Enter the 6-digit code sent to your phone</p>
+            <p className="auth-subtitle">Enter the 6-digit code sent to your email</p>
 
             <form onSubmit={handleOtpSubmit}>
               <div className="otp-inputs">
@@ -239,6 +227,9 @@ function AuthSystem({ onAuth }) {
                     pattern="[0-9]"
                     name={`otp${index}`}
                     required
+                    onChange={(e) => handleOtpInput(e, index)}
+                    onKeyDown={(e) => handleOtpKeyDown(e, index)}
+                    onPaste={handleOtpPaste}
                   />
                 ))}
               </div>
@@ -270,10 +261,10 @@ function AuthSystem({ onAuth }) {
               <button
                 type="button"
                 className="resend-link"
-                onClick={backToPhone}
+                onClick={backToEmail}
                 style={{ background: 'none', border: 'none', color: '#c9a84c', cursor: 'pointer' }}
               >
-                ← Back to phone number
+                ← Back to email address
               </button>
             </div>
           </div>
