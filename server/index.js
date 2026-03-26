@@ -29,11 +29,6 @@ const otpLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-const isDemoMode =
-    !process.env.EMAIL_USER ||
-    !process.env.EMAIL_PASS ||
-    process.env.EMAIL_USER === 'test@gmail.com' ||
-    process.env.EMAIL_PASS === 'test';
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -100,12 +95,6 @@ app.post('/api/send-otp', otpLimiter, async (req, res) => {
         html: buildHtmlTemplate(otp),
     };
 
-    if (isDemoMode) {
-        // Demo mode: log to console only, never expose OTP in response
-        console.log(`[DEMO] OTP for ${email}: ${otp}`);
-        return res.json({ success: true, message: 'OTP sent (demo mode — check server console).' });
-    }
-
     try {
         await transporter.sendMail(mailOptions);
         console.log(`✅ OTP email sent to ${email}`);
@@ -119,5 +108,5 @@ app.post('/api/send-otp', otpLimiter, async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT} [${isDemoMode ? 'DEMO' : 'PRODUCTION'} mode]`);
+    console.log(`Server listening on port ${PORT}`);
 });
