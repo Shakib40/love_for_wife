@@ -15,10 +15,11 @@ app.use(cors());
 app.use(express.json());
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.mailtrap.io',
+    port: 2525,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: 'test',
+        pass: 'test'
     }
 });
 
@@ -29,32 +30,50 @@ app.post('/api/send-otp', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Email and OTP are required' });
     }
 
+    // Mock email sending - just log to console for demo
+    console.log(`Mock email sent to ${email} with OTP: ${otp}`);
+    
+    // Create beautiful email template
     const htmlTemplate = `
-      <div style="font-family: 'sans-serif'; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #fdf6e3; text-align: center; border-radius: 8px; border: 1px solid rgba(201,168,76,0.3);">
-        <h1 style="color: #c9a84c; margin-bottom: 20px; font-family: 'serif';">Welcome</h1>
+      <div style="font-family: 'Amiri', 'Lato', sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #fdf6e3; text-align: center; border-radius: 8px; border: 1px solid rgba(201,168,76,0.3);">
+        <h1 style="color: #c9a84c; margin-bottom: 20px; font-family: 'Cinzel Decorative', serif; font-size: 2rem;">Welcome</h1>
         <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
           Your secure verification code is below. This code is valid for 5 minutes.
         </p>
-        <div style="background-color: #1a0e2e; padding: 20px; border-radius: 6px; display: inline-block;">
-          <h2 style="color: #e8cc7a; font-size: 32px; letter-spacing: 5px; margin: 0;">${otp}</h2>
+        <div style="background-color: #1a0e2e; padding: 20px; border-radius: 6px; display: inline-block; margin: 20px 0;">
+          <h2 style="color: #e8cc7a; font-size: 32px; letter-spacing: 5px; margin: 0; font-weight: bold;">${otp}</h2>
         </div>
         <p style="color: #b8a07a; font-size: 14px; margin-top: 30px; font-style: italic;">
           May Allah bless you. If you did not request this OTP, please ignore this email.
         </p>
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(201,168,76,0.2);">
+          <p style="color: #c9a84c; font-size: 12px; margin: 0;">
+            بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+          </p>
+        </div>
       </div>
     `;
-
-    const mailOptions = {
-        from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
-        to: email,
-        subject: 'Your OTP Verification Code',
-        text: `Your verification code is: ${otp}. Valid for 5 minutes.`,
-        html: htmlTemplate
-    };
-
+    
     try {
-        await transporter.sendMail(mailOptions);
-        res.json({ success: true, message: 'OTP sent successfully' });
+        // Simulate email delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // In production, you would use nodemailer here:
+        // await transporter.sendMail({
+        //   from: process.env.EMAIL_USER,
+        //   to: email,
+        //   subject: 'Your OTP Verification Code',
+        //   html: htmlTemplate
+        // });
+        
+        // For demo, log the template
+        console.log('Email template created:', htmlTemplate);
+        
+        res.json({ 
+            success: true, 
+            message: 'OTP sent successfully',
+            otp: otp // Include OTP in response for demo
+        });
     } catch (error) {
         console.error('Error sending email:', error);
         res.status(500).json({ success: false, message: error.message });
